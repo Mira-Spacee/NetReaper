@@ -6,11 +6,17 @@ adapters/APs filter the raw layer-2 broadcast frames scapy injects. The ping
 sweep makes the OS resolve each host's MAC into its ARP cache (this works even
 for hosts that block ICMP, as long as they answer ARP), which we then read.
 """
+import logging
 import re
 import socket
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
+
+# Silence scapy's cosmetic runtime warnings (e.g. "Mac address to reach
+# destination not found. Using broadcast.") — harmless ARP-layer chatter that
+# would otherwise clutter the live dashboard.
+logging.getLogger('scapy.runtime').setLevel(logging.ERROR)
 
 import vendor
 from device import Device
