@@ -29,20 +29,20 @@ NetReaper performs an **ARP-spoofing (ARP cache poisoning) man-in-the-middle** a
                                                    /_/
                       >> LAN ARP MITM CONSOLE //  authorized use only <<
 
-┌──────────────────────────────────────────────────────────────────────────────────────────┐
-│   IFACE 192.168.0.100   YOU 192.168.0.100   GATEWAY 192.168.0.1   HOSTS 6   CUT 2        │
-└──────────────────────────────────────────────────────────────────────────────────────────┘
-┌─────┬───────────────┬───────────────────┬────────────┬──────────────┬─────────┬──────────┐
-│   # │ IP ADDRESS    │ MAC               │ VENDOR     │ HOSTNAME     │    PKTS │ STATUS   │
-├─────┼───────────────┼───────────────────┼────────────┼──────────────┼─────────┼──────────┤
-│   1 │ 192.168.0.1   │ de:ad:be:ef:00:01 │ Example Co │ router       │       — │ ◆ ROUTER │
-│   2 │ 192.168.0.21  │ 02:00:00:11:22:33 │ Randomized │ phone        │       — │ ● ONLINE │
-│   3 │ 192.168.0.37  │ aa:bb:cc:dd:ee:01 │ Acme Inc   │ game-console │     148 │ ✖ CUT    │
-│   4 │ 192.168.0.55  │ aa:bb:cc:dd:ee:02 │ Acme Inc   │ ip-camera    │       — │ ● ONLINE │
-│   5 │ 192.168.0.100 │ aa:bb:cc:dd:ee:03 │ Example Co │ my-pc        │       — │ ★ THIS PC│
-│   6 │ 192.168.0.142 │ 02:00:00:44:55:66 │ Randomized │ smart-tv     │      92 │ ✖ CUT    │
-└─────┴───────────────┴───────────────────┴────────────┴──────────────┴─────────┴──────────┘
-  COMMANDS  scan  scan deep  cut <n>  restore <n>  cut all  restore all  help  quit
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│   IFACE 192.168.0.100   YOU 192.168.0.100   GATEWAY 192.168.0.1   HOSTS 6   CUT 2            │
+└──────────────────────────────────────────────────────────────────────────────────────────────┘
+┌──────┬────────────────┬────────────────────┬────────────┬──────────────┬─────────┬───────────┐
+│    # │ IP ADDRESS     │ MAC                │ VENDOR     │ HOSTNAME     │    PKTS │ STATUS    │
+├──────┼────────────────┼────────────────────┼────────────┼──────────────┼─────────┼───────────┤
+│    1 │ 192.168.0.1    │ de:ad:be:ef:00:01  │ Example Co │ router       │       — │ ◆ ROUTER  │
+│    2 │ 192.168.0.21   │ 02:00:00:11:22:33  │ Randomized │ phone        │       — │ ● ONLINE  │
+│    3 │ 192.168.0.37   │ aa:bb:cc:dd:ee:01  │ Acme Inc   │ game-console │     148 │ ✖ CUT     │
+│    4 │ 192.168.0.55   │ aa:bb:cc:dd:ee:02  │ Acme Inc   │ ip-camera    │      64 │ ▼ 50% DROP│
+│    5 │ 192.168.0.100  │ aa:bb:cc:dd:ee:03  │ Example Co │ my-pc        │       — │ ★ THIS PC │
+│    6 │ 192.168.0.142  │ 02:00:00:44:55:66  │ Randomized │ smart-tv     │      92 │ ✖ CUT     │
+└──────┴────────────────┴────────────────────┴────────────┴──────────────┴─────────┴───────────┘
+  COMMANDS  scan  scan deep  cut <n>  throttle <n> <%>  restore <n>  cut all  help  quit
   netreaper >
 ```
 
@@ -51,6 +51,7 @@ NetReaper performs an **ARP-spoofing (ARP cache poisoning) man-in-the-middle** a
 - **🖥️ Live cyber-themed dashboard** — a `rich`-powered table that redraws in place (no scrolling spam). Shows index, IP, MAC, vendor, hostname, packets sent, and live status.
 - **🔁 Fully interactive** — cut and restore devices on the fly without restarting. Type a command, watch the table update, type another.
 - **🎯 Flexible multi-target selection** — `cut 1`, `cut 2 3 4`, `cut 1+2`, `cut 1,3`, `cut 2-4`, or `cut all`.
+- **🐌 Bandwidth throttling** — `throttle 3 50` doesn't fully cut a device; it forwards its traffic but **drops 50% of the packets**. TCP reads the loss as congestion and backs off, so the connection just gets *slow* instead of dying. A softer, sneakier alternative to a hard cut — and a great demo of how packet loss degrades a link. Works on Windows *and* Linux with no extra drivers (pure scapy).
 - **🔎 Reliable Wi-Fi discovery** — uses a **ping-sweep + OS ARP-table read** instead of a raw scapy broadcast sweep, which Wi-Fi access points silently filter. This is why it finds *all* active devices where naïve scanners find only the router.
 - **🌊 Deep scan** — `scan deep` runs three passes and unions the results to catch devices that are asleep/idle on a single pass.
 - **🏷️ Vendor & randomization detection** — resolves manufacturer from a bundled offline IEEE OUI database, and flags privacy-randomized MACs (modern phones) as `Randomized` — a built-in lesson on why MAC fingerprinting is unreliable.
@@ -67,6 +68,13 @@ Devices on a LAN use **ARP** to map IP addresses to MAC addresses. ARP has no au
 
    Poisoned:  [ Target ] → [ You ] ✖ (dropped)
               [ Router ] → [ You ] ✖ (dropped)
+```
+
+**Throttle** is the same poisoning, but instead of dropping *everything*, NetReaper forwards the target's traffic back out to the real router — while randomly discarding a set percentage of packets. TCP interprets that loss as network congestion and slows down, so the device stays online but sluggish:
+
+```
+   Throttled 50%:  [ Target ] → [ You ] → forward 50% → [ Router ] → Internet
+                                       ↘ drop 50% ✖
 ```
 
 ## 📦 Requirements
@@ -104,6 +112,7 @@ sudo python3 main.py
 | `scan` | Quick discovery (~6s, single pass) |
 | `scan deep` | Thorough discovery (~15s, 3 passes — finds idle devices) |
 | `cut <sel>` | Kick the selected device(s) off the internet |
+| `throttle <sel> <pct>` | Slow the selected device(s) by dropping `<pct>%` of their packets (1–99) |
 | `restore <sel>` | Heal the selected device(s) and restore access |
 | `cut all` / `restore all` | Act on every targetable device |
 | `help` | Show the command reference |
@@ -120,7 +129,8 @@ sudo python3 main.py
 ## 🗺️ Roadmap
 
 - [ ] `detect` mode — spot when **someone is ARP-spoofing you** (the defensive counterpart)
-- [ ] Bandwidth throttling (traffic shaping) instead of a hard cut
+- [x] ~~Bandwidth throttling instead of a hard cut~~ — done (`throttle <sel> <pct>`)
+- [ ] Precise Mbps rate-limiting (true traffic shaping via `tc` on Linux)
 - [ ] CLI arguments for headless / scripted use
 - [ ] Linux gateway-detection hardening
 

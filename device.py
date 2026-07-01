@@ -9,8 +9,9 @@ class Device:
     vendor: str = 'Unknown'
     hostname: str = ''
     role: str = 'host'          # 'host' | 'gateway' | 'self'
-    status: str = 'online'      # 'online' | 'cut'
+    status: str = 'online'      # 'online' | 'cut' | 'throttled'
     packets: int = 0            # spoof packets sent at this target
+    throttle: int = 0           # % of packets dropped when status == 'throttled'
 
     @property
     def is_target(self) -> bool:

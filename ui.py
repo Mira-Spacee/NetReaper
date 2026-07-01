@@ -22,6 +22,7 @@ CYAN = 'bright_cyan'
 DANGER = 'bright_red'
 DIM = 'grey42'
 WARN = 'bright_yellow'
+ORANGE = 'orange1'
 
 console = Console()
 _fig = Figlet(font='slant')
@@ -41,6 +42,8 @@ def _status_cell(d) -> Text:
         return Text('★ THIS PC', style=f'bold {WARN}')
     if d.status == 'cut':
         return Text('✖ CUT', style=f'bold {DANGER}')
+    if d.status == 'throttled':
+        return Text(f'▼ {d.throttle}% DROP', style=f'bold {ORANGE}')
     return Text('● ONLINE', style=f'bold {ACCENT}')
 
 
@@ -57,7 +60,7 @@ def _device_table(state) -> Table:
 
     for i, d in enumerate(state.devices, 1):
         row_style = ''
-        if d.status == 'cut':
+        if d.status in ('cut', 'throttled'):
             row_style = 'on grey11'
         table.add_row(
             str(i),
@@ -65,7 +68,7 @@ def _device_table(state) -> Table:
             d.mac or '—',
             d.vendor,
             (d.hostname[:24] or '—'),
-            (str(d.packets) if d.status == 'cut' else '—'),
+            (str(d.packets) if d.status in ('cut', 'throttled') else '—'),
             _status_cell(d),
             style=row_style,
         )
@@ -89,8 +92,8 @@ def _help() -> Text:
     t = Text('  COMMANDS  ', style=f'bold {CYAN}')
     for cmd, desc in [
         ('scan', 'rediscover'), ('scan deep', 'thorough'), ('cut <n>', 'kick'),
-        ('restore <n>', 'heal'), ('cut all', ''), ('restore all', ''),
-        ('help', ''), ('quit', ''),
+        ('throttle <n> <%>', 'slow'), ('restore <n>', 'heal'),
+        ('cut all', ''), ('help', ''), ('quit', ''),
     ]:
         t.append(f'{cmd}', style=ACCENT)
         if desc:

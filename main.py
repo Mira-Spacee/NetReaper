@@ -104,6 +104,35 @@ def do_cut(state: State, arg: str) -> None:
     state.message = ('ok' if started else 'warn', ' '.join(parts))
 
 
+def do_throttle(state: State, arg: str) -> None:
+    parts = arg.strip().rsplit(None, 1)  # last token is the percent
+    if len(parts) != 2 or not parts[1].isdigit():
+        state.message = ('error', 'Usage: throttle <sel> <percent>, e.g. "throttle 1 50".')
+        return
+    sel, pct = parts[0], int(parts[1])
+    if not (1 <= pct <= 99):
+        state.message = ('error', 'Percent must be 1–99 (use "cut" for a full 100% block).')
+        return
+    if not state.spoofer.can_throttle:
+        state.message = ('error', 'Throttle unavailable: could not determine our own MAC/gateway MAC.')
+        return
+    targets = _resolve(state, sel)
+    if targets is None:
+        state.message = ('error', 'Invalid selection. Try e.g. "throttle 1+2 50".')
+        return
+    started, skipped = 0, 0
+    for d in targets:
+        if not d.is_target:
+            skipped += 1
+            continue
+        if state.spoofer.throttle(d, pct):
+            started += 1
+    parts_msg = [f'Throttling {started} device(s) to drop {pct}% of packets.']
+    if skipped:
+        parts_msg.append(f'(skipped {skipped} protected: router/this PC)')
+    state.message = ('ok' if started else 'warn', ' '.join(parts_msg))
+
+
 def do_restore(state: State, arg: str) -> None:
     targets = _resolve(state, arg)
     if targets is None:
@@ -116,6 +145,7 @@ def do_restore(state: State, arg: str) -> None:
 def _show_help() -> None:
     ui.info('', 'ok')
     ui.info('cut <sel>      kick device(s) off the internet', 'ok')
+    ui.info('throttle <sel> <pct>   slow device(s) by dropping <pct>% of packets', 'ok')
     ui.info('restore <sel>  heal device(s) and give internet back', 'ok')
     ui.info('scan           quick re-discovery (~6s, single pass)', 'ok')
     ui.info('scan deep      thorough discovery (~15s, 3 passes, finds idle devices)', 'ok')
@@ -161,6 +191,8 @@ def main() -> int:
             do_scan(state, deep=arg.strip().lower() in ('deep', 'd', '3', 'full'))
         elif cmd in ('c', 'cut'):
             do_cut(state, arg)
+        elif cmd in ('t', 'throttle'):
+            do_throttle(state, arg)
         elif cmd in ('r', 'restore'):
             do_restore(state, arg)
         elif cmd in ('h', 'help', '?'):
